@@ -1,0 +1,80 @@
+#!/usr/bin/env python3
+
+import fileinput
+from itertools import permutations
+
+from z3 import *
+
+
+class IDPool(object):
+
+    def __init__(self):
+        '''Simple and minimal data structure that provides functionality
+        similar to PySAT's IDPool class.'''
+        self.direct = dict()
+        self.reverse = list()
+    
+    def iid(self, obj):
+        '''Inserts obj into IDPool if it does not already exist. Returns the
+        integer ID associated to obj.'''
+        if obj not in self.direct:
+            self.direct[obj] = len(self.reverse) + 1
+            self.reverse.append(obj)
+        return self.direct[obj]
+    
+    def obj(self, iid):
+        '''Get the object associated to iid. Raises IndexError if iid is not
+        attributed to an object in IDPool.'''
+        return self.reverse[iid - 1]        
+
+
+if __name__ == '__main__':
+    varpool = IDPool()
+    solver = Solver()
+
+    with fileinput.input() as sms:
+        # Number of tasks, parameters and dependencies
+        n = int(sms.readline().strip('\n'))
+        pars = dict.fromkeys(range(1, n + 1))
+        deps = dict.fromkeys(range(1, n + 1))
+
+        for l in range(1, n + 1):
+            # Current task info
+            task = list(map(int, sms.readline().split()))
+
+            # Format: (r, p, d, k, list of fragments)
+            pars[l] = tuple(task[:4] + [task[4:]])
+        
+        for l in range(1, n + 1):
+            # Ignore first digit, correspondent to the number of dependencies
+            deps[l] = list(map(int, sms.readline().split()[1:]))
+
+    # C1: first fragment of every task must start after ready time
+    for l in range(1, n + 1):
+        solver.add(Int(varpool.iid(('s', l, 1))) >= pars[l][0])
+    
+    # C2: sequential execution of fragments
+    for l in range(1, n + 1):
+        for i in range(1, pars[l][3]):
+            # Remark: pars[l][4][i - 1] is the execution time of fragment (l, i)
+            solver.add(Int(varpool.iid(('s', l, i + 1))) >= varpool.iid(('s', \
+                l, i)) + pars[l][4][i - 1])
+    
+    # C3: no fragment overlapping
+    # To do
+
+    # C4: if task l depends on task k, l must start after k
+    for (l, k) in permutations(range(1, n + 1), 2):
+        if l in deps[k]:
+            pass
+            # To do; really messy
+            # solver.add(Or(Int(varpool.iid(('s', l, 1))) >= Int(varpool.iid(('s', \
+            #     k, pars[k][3]))) + pars[k][4][-1], Implies(Int(varpool.iid(('s', \
+            #     k, pars[k][3]))) + pars[k][4][-1] > pars[k][2], Int(varpool.iid(('s', \
+            #     l, ))))))
+    
+    # C5: each task must be completed by its deadline
+    # To do: this should be a soft constraint
+    for l in range(1, n + 1):
+        solver.add(Int(varpool.iid(('s', l, pars[l][3]))) + pars[l][4][-1] <= \
+            pars[l][2])
