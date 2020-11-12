@@ -78,22 +78,38 @@ if __name__ == '__main__':
                 Int(varpool.id(('s', k, j))) + pars[k][4][j - 1]))
 
     # C4: if task l depends on task k, l must start after k
-    for (l, k) in permutations(range(1, n + 1), 2):
-        if l in deps[k]:
-            opt.add(Or(Int(varpool.id(('s', l, 1))) >= Int(varpool.id(('s', \
-                k, pars[k][3]))) + pars[k][4][-1], Implies(Int(varpool.id(('s', \
-                k, pars[k][3]))) + pars[k][4][-1] > pars[k][2], Int(varpool.id( \
-                ('s', l, 1))) == float('inf')))) # Probably doesn't work
+    # for (l, k) in permutations(range(1, n + 1), 2):
+    #     if l in deps[k]:
+    #         opt.add(Or(Int(varpool.id(('s', l, 1))) >= Int(varpool.id(('s', \
+    #             k, pars[k][3]))) + pars[k][4][-1], Implies(Int(varpool.id(('s', \
+    #             k, pars[k][3]))) + pars[k][4][-1] > pars[k][2], Int(varpool.id( \
+    #             ('s', l, 1))) == float('inf'))))
     
     # C5: each task must be completed by its deadline
     for l in range(1, n + 1):
         opt.add_soft(Int(varpool.id(('s', l, pars[l][3]))) + pars[l][4][-1] <= \
             pars[l][2])
     
+    # Find a solution
     opt.check()
     model = opt.model()
 
+    # Auxiliary variables
+    scheduled = list()
+    schedule = dict()
+
+    # Solution interpretation
     for l in range(1, n + 1):
         if (model.eval(Int(varpool.id(('s', l, pars[l][3]))) + pars[l][4][-1] <= \
             pars[l][2])):
-            print(f'Scheduled task {l}')
+            scheduled.append(l)
+            schedule[f'{l}'] = [model.eval(Int(varpool.id(('s', l, i)))).as_string()
+                for i in range(1, pars[l][3] + 1)]
+    
+    # Generate output
+    output = f'{len(scheduled)}\n'
+    for (l, t) in schedule.items():
+        output += f'{l} ' + ' '.join(t) + '\n'
+
+    # Print output to stdout
+    print(output.rstrip('\n'))
