@@ -3,7 +3,7 @@
 import fileinput
 from itertools import combinations, permutations
 
-from z3 import Implies, Int, Optimize, Or
+from z3 import And, Implies, Int, Optimize, Or
 
 
 class IDPool(object):
@@ -25,14 +25,23 @@ class IDPool(object):
     def obj(self, id):
         '''Get the object associated to id. Raises IndexError if id is not
         attributed to an object in IDPool.'''
-        return self.reverse[id - 1]        
+        return self.reverse[id - 1]
+
+
+class Inf(object):
+
+    def __init__(self):
+        self.inf = '+inf'
+    
+    def __eq__(self, other):
+        return isinstance(other, Inf)
 
 
 if __name__ == '__main__':
     varpool = IDPool()
     opt = Optimize()
 
-    with fileinput.input() as sms:
+    with open('tests/t1_d.sms') as sms:
         # Number of tasks, parameters and dependencies
         n = int(sms.readline().strip('\n'))
         pars = dict.fromkeys(range(1, n + 1))
@@ -78,12 +87,16 @@ if __name__ == '__main__':
                 Int(varpool.id(('s', k, j))) + pars[k][4][j - 1]))
 
     # C4: if task l depends on task k, l must start after k
-    # for (l, k) in permutations(range(1, n + 1), 2):
-    #     if l in deps[k]:
-    #         opt.add(Or(Int(varpool.id(('s', l, 1))) >= Int(varpool.id(('s', \
-    #             k, pars[k][3]))) + pars[k][4][-1], Implies(Int(varpool.id(('s', \
-    #             k, pars[k][3]))) + pars[k][4][-1] > pars[k][2], Int(varpool.id( \
-    #             ('s', l, 1))) == float('inf'))))
+    # Find out how to do this properly
+    for (l, k) in permutations(range(1, n + 1), 2):
+        if k in deps[l]:
+            opt.add(And(
+                Int(varpool.id(('s', l, 1))) >= Int(varpool.id(('s', k, pars[k][3]))) + pars[k][4][-1],
+                Implies(
+                    Int(varpool.id(('s', k, pars[k][3]))) + pars[k][4][-1] > pars[k][2],
+                    Int(varpool.id(('s', l, 1))) == 2000000000)
+                )
+            )
     
     # C5: each task must be completed by its deadline
     for l in range(1, n + 1):
