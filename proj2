@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 
 import fileinput
-from itertools import permutations
+from itertools import combinations, permutations
 
-from z3 import *
+from z3 import Implies, Int, Optimize, Or
 
 
 class IDPool(object):
@@ -14,7 +14,7 @@ class IDPool(object):
         self.direct = dict()
         self.reverse = list()
     
-    def iid(self, obj):
+    def id(self, obj):
         '''Inserts obj into IDPool if it does not already exist. Returns the
         integer ID associated to obj.'''
         if obj not in self.direct:
@@ -22,15 +22,15 @@ class IDPool(object):
             self.reverse.append(obj)
         return self.direct[obj]
     
-    def obj(self, iid):
-        '''Get the object associated to iid. Raises IndexError if iid is not
+    def obj(self, id):
+        '''Get the object associated to id. Raises IndexError if id is not
         attributed to an object in IDPool.'''
-        return self.reverse[iid - 1]        
+        return self.reverse[id - 1]        
 
 
 if __name__ == '__main__':
     varpool = IDPool()
-    solver = Solver()
+    opt = Optimize()
 
     with fileinput.input() as sms:
         # Number of tasks, parameters and dependencies
@@ -49,32 +49,51 @@ if __name__ == '__main__':
             # Ignore first digit, correspondent to the number of dependencies
             deps[l] = list(map(int, sms.readline().split()[1:]))
 
+    # Fragment generating function
+    domain = lambda: ((l, i)
+        for l in range(1, n + 1)
+        for i in range(1, pars[l][3] + 1))
+    
+    # Timing functions
+    est = lambda l, i: pars[l][0] + sum(pars[l][4][:i - 1])
+    lct = lambda l, i: pars[l][2] - sum(pars[l][4][i:])
+
     # C1: first fragment of every task must start after ready time
     for l in range(1, n + 1):
-        solver.add(Int(varpool.iid(('s', l, 1))) >= pars[l][0])
+        opt.add(Int(varpool.id(('s', l, 1))) >= pars[l][0])
     
     # C2: sequential execution of fragments
     for l in range(1, n + 1):
         for i in range(1, pars[l][3]):
             # Remark: pars[l][4][i - 1] is the execution time of fragment (l, i)
-            solver.add(Int(varpool.iid(('s', l, i + 1))) >= varpool.iid(('s', \
-                l, i)) + pars[l][4][i - 1])
+            opt.add(Int(varpool.id(('s', l, i + 1))) >= Int(varpool.id(('s', \
+                l, i))) + pars[l][4][i - 1])
     
     # C3: no fragment overlapping
-    # To do
+    for ((l, i), (k, j)) in combinations(domain(), 2):
+        if (k != l and k not in deps[l] and l not in deps[k] and
+            est(k, j) < lct(l, i) and est(l, i) < lct(k, j)):
+            opt.add(Or(Int(varpool.id(('s', k, j))) >= Int(varpool.id(('s', \
+                l, i))) + pars[l][4][i - 1], Int(varpool.id(('s', l, i))) >= \
+                Int(varpool.id(('s', k, j))) + pars[k][4][j - 1]))
 
     # C4: if task l depends on task k, l must start after k
     for (l, k) in permutations(range(1, n + 1), 2):
         if l in deps[k]:
-            pass
-            # To do; really messy
-            # solver.add(Or(Int(varpool.iid(('s', l, 1))) >= Int(varpool.iid(('s', \
-            #     k, pars[k][3]))) + pars[k][4][-1], Implies(Int(varpool.iid(('s', \
-            #     k, pars[k][3]))) + pars[k][4][-1] > pars[k][2], Int(varpool.iid(('s', \
-            #     l, ))))))
+            opt.add(Or(Int(varpool.id(('s', l, 1))) >= Int(varpool.id(('s', \
+                k, pars[k][3]))) + pars[k][4][-1], Implies(Int(varpool.id(('s', \
+                k, pars[k][3]))) + pars[k][4][-1] > pars[k][2], Int(varpool.id( \
+                ('s', l, 1))) == float('inf')))) # Probably doesn't work
     
     # C5: each task must be completed by its deadline
-    # To do: this should be a soft constraint
     for l in range(1, n + 1):
-        solver.add(Int(varpool.iid(('s', l, pars[l][3]))) + pars[l][4][-1] <= \
+        opt.add_soft(Int(varpool.id(('s', l, pars[l][3]))) + pars[l][4][-1] <= \
             pars[l][2])
+    
+    opt.check()
+    model = opt.model()
+
+    for l in range(1, n + 1):
+        if (model.eval(Int(varpool.id(('s', l, pars[l][3]))) + pars[l][4][-1] <= \
+            pars[l][2])):
+            print(f'Scheduled task {l}')
