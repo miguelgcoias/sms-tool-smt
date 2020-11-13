@@ -5,40 +5,7 @@ from itertools import combinations, permutations
 
 from z3 import And, Implies, Int, Optimize, Or
 
-
-class IDPool(object):
-
-    def __init__(self):
-        '''Simple and minimal data structure that provides functionality
-        similar to PySAT's IDPool class.'''
-        self.direct = dict()
-        self.reverse = list()
-    
-    def id(self, obj):
-        '''Inserts obj into IDPool if it does not already exist. Returns the
-        integer ID associated to obj.'''
-        if obj not in self.direct:
-            self.direct[obj] = len(self.reverse) + 1
-            self.reverse.append(obj)
-        return self.direct[obj]
-    
-    def obj(self, id):
-        '''Get the object associated to id. Raises IndexError if id is not
-        attributed to an object in IDPool.'''
-        return self.reverse[id - 1]
-
-
-class Inf(object):
-
-    def __init__(self):
-        self.inf = '+inf'
-    
-    def __eq__(self, other):
-        return isinstance(other, Inf)
-
-
 if __name__ == '__main__':
-    varpool = IDPool()
     opt = Optimize()
 
     with fileinput.input() as sms:
@@ -69,40 +36,38 @@ if __name__ == '__main__':
 
     # C1: first fragment of every task must start after ready time
     for l in range(1, n + 1):
-        opt.add(Int(varpool.id(('s', l, 1))) >= pars[l][0])
+        opt.add(Int(f's_{l},1') >= pars[l][0])
     
     # C2: sequential execution of fragments
     for l in range(1, n + 1):
         for i in range(1, pars[l][3]):
             # Remark: pars[l][4][i - 1] is the execution time of fragment (l, i)
-            opt.add(Int(varpool.id(('s', l, i + 1))) >= Int(varpool.id(('s', \
-                l, i))) + pars[l][4][i - 1])
-    
+            opt.add(Int(f's_{l},{i + 1}') >= Int(f's_{l},{i}') + pars[l][4][i - 1])
+
     # C3: no fragment overlapping
     for ((l, i), (k, j)) in combinations(domain(), 2):
         if (k != l and k not in deps[l] and l not in deps[k] and
             est(k, j) < lct(l, i) and est(l, i) < lct(k, j)):
-            opt.add(Or(Int(varpool.id(('s', k, j))) >= Int(varpool.id(('s', \
-                l, i))) + pars[l][4][i - 1], Int(varpool.id(('s', l, i))) >= \
-                Int(varpool.id(('s', k, j))) + pars[k][4][j - 1]))
+            opt.add(Or(
+                Int(f's_{k},{j}') >= Int(f's_{l},{i}') + pars[l][4][i - 1],
+                Int(f's_{l},{i}') >= Int(f's_{k},{j}') + pars[k][4][j - 1]))
 
     # C4: if task l depends on task k, l must start after k
-    # Remark: ('s', l, 1) is not set to +oo since forcing l to start after its
+    # Remark: 'sl1' is not set to +oo since forcing l to start after its
     # deadline is enough
-    for (l, k) in permutations(range(1, n + 1), 2):
-        if k in deps[l]:
+    for l in range(1, n + 1):
+        for k in deps[l]:
             opt.add(And(
-                Int(varpool.id(('s', l, 1))) >= Int(varpool.id(('s', k, pars[k][3]))) + pars[k][4][-1],
-                Implies(
-                    Int(varpool.id(('s', k, pars[k][3]))) + pars[k][4][-1] > pars[k][2],
-                    Int(varpool.id(('s', l, 1))) == pars[l][2] + 1)
+                Int(f's_{l},1') >= Int(f's_{k},{pars[k][3]}') + pars[k][4][-1],
+                Or(
+                    Int(f's_{k},{pars[k][3]}') + pars[k][4][-1] <= pars[k][2],
+                    Int(f's_{l},1') > pars[l][2])
                 )
             )
     
     # C5: each task must be completed by its deadline
     for l in range(1, n + 1):
-        opt.add_soft(Int(varpool.id(('s', l, pars[l][3]))) + pars[l][4][-1] <= \
-            pars[l][2])
+        opt.add_soft(Int(f's_{l},{pars[l][3]}') + pars[l][4][-1] <= pars[l][2])
     
     # Find a solution
     opt.check()
@@ -114,10 +79,9 @@ if __name__ == '__main__':
 
     # Solution interpretation
     for l in range(1, n + 1):
-        if (model.eval(Int(varpool.id(('s', l, pars[l][3]))) + pars[l][4][-1] <= \
-            pars[l][2])):
+        if model.eval(Int(f's_{l},{pars[l][3]}') + pars[l][4][-1] <= pars[l][2]):
             scheduled.append(l)
-            schedule[f'{l}'] = [model.eval(Int(varpool.id(('s', l, i)))).as_string()
+            schedule[f'{l}'] = [model.eval(Int(f's_{l},{i}')).as_string()
                 for i in range(1, pars[l][3] + 1)]
     
     # Generate output
