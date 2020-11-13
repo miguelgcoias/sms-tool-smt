@@ -41,7 +41,7 @@ if __name__ == '__main__':
     varpool = IDPool()
     opt = Optimize()
 
-    with open('tests/t1_d.sms') as sms:
+    with fileinput.input() as sms:
         # Number of tasks, parameters and dependencies
         n = int(sms.readline().strip('\n'))
         pars = dict.fromkeys(range(1, n + 1))
@@ -87,14 +87,15 @@ if __name__ == '__main__':
                 Int(varpool.id(('s', k, j))) + pars[k][4][j - 1]))
 
     # C4: if task l depends on task k, l must start after k
-    # Find out how to do this properly
+    # Remark: ('s', l, 1) is not set to +oo since forcing l to start after its
+    # deadline is enough
     for (l, k) in permutations(range(1, n + 1), 2):
         if k in deps[l]:
             opt.add(And(
                 Int(varpool.id(('s', l, 1))) >= Int(varpool.id(('s', k, pars[k][3]))) + pars[k][4][-1],
                 Implies(
                     Int(varpool.id(('s', k, pars[k][3]))) + pars[k][4][-1] > pars[k][2],
-                    Int(varpool.id(('s', l, 1))) == 2000000000)
+                    Int(varpool.id(('s', l, 1))) == pars[l][2] + 1)
                 )
             )
     
