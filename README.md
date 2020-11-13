@@ -18,9 +18,9 @@ The tool will output an answer in the following format:
 ## Execution
 The tool should be executed with the command
 ```
-/path/to/proj2 < job.sms > solution.txt
+/path/to/proj2 < job.sms > solution.out
 ```
-where job.sms is a text file formatted as specified above, and solution.txt is a file where the solution will be written to.
+where job.sms is a text file formatted as specified above, and solution.out is a file where the solution will be written to.
 
 ## Dependencies
-z3-solver must be installed.
+[z3-solver](https://pypi.org/project/z3-solver/) must be installed.
