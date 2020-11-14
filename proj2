@@ -50,10 +50,11 @@ if __name__ == '__main__':
             est(k, j) < lct(l, i) and est(l, i) < lct(k, j)):
             opt.add(Or(
                 Int(f's_{k},{j}') >= Int(f's_{l},{i}') + pars[l][4][i - 1],
-                Int(f's_{l},{i}') >= Int(f's_{k},{j}') + pars[k][4][j - 1]))
+                Int(f's_{l},{i}') >= Int(f's_{k},{j}') + pars[k][4][j - 1])
+            )
 
     # C4: if task l depends on task k, l must start after k
-    # Remark: 'sl1' is not set to +oo since forcing l to start after its
+    # Remark: 'sl1' is not set to +oo; forcing l to start after its
     # deadline is enough
     for l in range(1, n + 1):
         for k in deps[l]:
@@ -74,18 +75,18 @@ if __name__ == '__main__':
     model = opt.model()
 
     # Auxiliary variables
-    scheduled = list()
+    scheduled = 0
     schedule = dict()
 
     # Solution interpretation
     for l in range(1, n + 1):
         if model.eval(Int(f's_{l},{pars[l][3]}') + pars[l][4][-1] <= pars[l][2]):
-            scheduled.append(l)
+            scheduled += 1
             schedule[f'{l}'] = [model.eval(Int(f's_{l},{i}')).as_string()
                 for i in range(1, pars[l][3] + 1)]
     
     # Generate output
-    output = f'{len(scheduled)}\n'
+    output = f'{scheduled}\n'
     for (l, t) in schedule.items():
         output += f'{l} ' + ' '.join(t) + '\n'
 
