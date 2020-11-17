@@ -18,7 +18,7 @@ The tool will output an answer in the following format:
 ## Execution
 The tool should be executed with the command
 ```
-/path/to/proj2 < job.sms > solution.out
+/path/to/sms-tool-smt < job.sms > solution.out
 ```
 where job.sms is a text file formatted as specified above, and solution.out is a file where the solution will be written to.
 
