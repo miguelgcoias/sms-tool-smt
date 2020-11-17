@@ -24,11 +24,6 @@ if __name__ == '__main__':
         for l in range(1, n + 1):
             # Ignore first digit, correspondent to the number of dependencies
             deps[l] = list(map(int, sms.readline().split()[1:]))
-
-    # Fragment generating function
-    domain = lambda: ((l, i)
-        for l in range(1, n + 1)
-        for i in range(1, pars[l][3] + 1))
     
     # Timing functions
     est = lambda l, i: pars[l][0] + sum(pars[l][4][:i - 1])
@@ -43,9 +38,13 @@ if __name__ == '__main__':
         for i in range(1, pars[l][3]):
             # Remark: pars[l][4][i - 1] is the execution time of fragment (l, i)
             opt.add(Int(f's_{l},{i + 1}') >= Int(f's_{l},{i}') + pars[l][4][i - 1])
-
+    
+    # Fragment generator
+    domain = ((l, i)
+        for l in range(1, n + 1)
+        for i in range(1, pars[l][3] + 1))
     # C3: no fragment overlapping
-    for ((l, i), (k, j)) in combinations(domain(), 2):
+    for ((l, i), (k, j)) in combinations(domain, 2):
         if (k != l and k not in deps[l] and l not in deps[k] and
             est(k, j) < lct(l, i) and est(l, i) < lct(k, j)):
             opt.add(Or(
