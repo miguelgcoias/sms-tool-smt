@@ -1,4 +1,4 @@
-# Single machine scheduling tool
+# Single machine scheduling tool (SMT version)
 A Python tool that generates an optimal schedule for a set of tasks and their time and dependency constraints.
 
 ## Theoretical work
